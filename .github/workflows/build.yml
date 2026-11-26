@@ -1,0 +1,52 @@
+name: Build 5D APK
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    defaults:
+      run:
+        working-directory: five_d
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Unzip project
+        working-directory: .
+        run: unzip -o 5d_project.zip
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+
+      - name: Create fresh Android files
+        run: |
+          cp -r lib /tmp/lib_bak
+          cp pubspec.yaml /tmp/pubspec_bak.yaml
+          flutter create --platforms=android --org com.fived --project-name five_d .
+          rm -rf lib test
+          cp -r /tmp/lib_bak lib
+          cp /tmp/pubspec_bak.yaml pubspec.yaml
+
+      - name: Apply 5D Android settings
+        run: python3 ci/patch.py
+
+      - name: Get packages
+        run: flutter pub get
+
+      - name: Build APK
+        run: flutter build apk --release --split-per-abi
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: 5D-apk
+          path: five_d/build/app/outputs/flutter-apk/*.apk
